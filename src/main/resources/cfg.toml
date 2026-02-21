@@ -1,0 +1,30 @@
+[hours]
+monday = { open = "08:00", close = "21:00" }
+tuesday = { open = "09:00", close = "21:00" }
+wednesday = { open = "08:00", close = "21:00" }
+thursday = { open = "09:00", close = "21:00" }
+friday = { open = "08:00", close = "21:00" }
+saturday = { open = "09:00", close = "21:00" }
+sunday = { open = "10:00", close = "18:00" }
+
+[staffing_percent]
+monday = 70
+tuesday = 60
+wednesday = 50
+thursday = 60
+friday = 70
+saturday = 80
+sunday = 60
+
+shift_lengths = [6, 8, 10, 12]
+
+[peak_hours]
+monday = 13:00:00
+tuesday = 13:00:00
+wednesday = 13:00:00
+thursday = 13:00:00
+friday = 13:00:00
+saturday = 09:00:00
+sunday = 10:00:00
+
+max_working_days_in_a_row = 5
