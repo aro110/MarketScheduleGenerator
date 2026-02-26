@@ -21,8 +21,7 @@ public class Employee {
         this.section = section;
         this.totalHours = totalHours;
         this.totalDays = totalDays;
-        ShiftPool shiftPool = new ShiftPool();
-        this.shiftPool = shiftPool.generateAll(totalHours, totalDays);
+        this.shiftPool = ShiftPool.getInstance().generateAll(totalHours, totalDays);
         validateTotalHours(Config.getInstance().getShiftLengths());
         validateTotalDays(totalDays);
     }

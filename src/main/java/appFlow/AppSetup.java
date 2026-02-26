@@ -3,13 +3,27 @@ package appFlow;
 import model.Employee;
 import model.Section;
 
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class AppSetup {
     private final InputReader reader = new InputReader();
 
-    public List<Section> setup() {
+    public record AppData(YearMonth yearMonth, List<Section> sections) {}
+
+    public AppData setup() {
+        YearMonth yearMonth = setupYearMonth();
+        List<Section> sections = setupSections();
+        return new AppData(yearMonth, sections);
+    }
+
+    public YearMonth setupYearMonth() {
+        return reader.readYearMonth();
+    }
+
+    public List<Section> setupSections() {
         List<Section> sections = new ArrayList<>();
         int sectionCount = reader.readInt("Podaj liczbę działów: ");
 
