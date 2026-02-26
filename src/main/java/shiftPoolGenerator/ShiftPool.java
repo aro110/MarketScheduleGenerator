@@ -3,22 +3,42 @@ package shiftPoolGenerator;
 import cfg.Config;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ShiftPool {
+    private static ShiftPool instance;
     private final List<Integer> shifts;
+    private final Map<String, List<ShiftCombination>> cache = new HashMap<>();
 
-    public ShiftPool() {
+    private ShiftPool() {
         this.shifts = Config.getInstance().getShiftLengths();
     }
 
+    public static ShiftPool getInstance() {
+        if (instance == null) {
+            instance = new ShiftPool();
+        }
+        return instance;
+    }
+
     public List<ShiftCombination> generateAll(int totalHours, int days) {
+        String key = totalHours + "-" + days;
+        if (cache.containsKey(key)) {
+            return cache.get(key);
+        }
+
         List<List<Integer>> results = new ArrayList<>();
         backtrack(totalHours, days, 0, new ArrayList<>(), results);
         List<ShiftCombination> shiftCombinations = new ArrayList<>();
-        for (List<Integer> combination : results) shiftCombinations.add(new ShiftCombination(combination));
+        for (List<Integer> combination : results) {
+            shiftCombinations.add(new ShiftCombination(combination));
+        }
         ShiftClusterer clusterer = new ShiftClusterer(shiftCombinations);
-        return clusterer.getRepresentatives(4); // zmien potem na wartosc z configu
+        List<ShiftCombination> representatives = clusterer.getRepresentatives(4);
+        cache.put(key, representatives);
+        return representatives;
     }
 
     private void backtrack(int remaining, int slotsLeft, int startIndex,
@@ -45,4 +65,5 @@ public class ShiftPool {
             current.removeLast();
         }
     }
+
 }

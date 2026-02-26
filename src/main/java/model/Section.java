@@ -19,4 +19,8 @@ public class Section {
             throw new IllegalArgumentException("Liczba pracowników musi być większa niż 0.");
         }
     }
+
+    public List<Employee> getEmployees() {
+        return employees;
+    }
 }
