@@ -24,6 +24,10 @@ public class Config {
     private final int maxWorkingDaysInARow;
     // dodaj godziny startu
     // dodaj ile ma byc roznych ShiftPool
+    //Co można poprawić, ale nie teraz:
+    //
+    //Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał testować różne funkcje oceny
+    //Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy będziesz eksperymentował z różnymi podejściami
 
     private static final String[] DAY_NAMES = {
             "monday", "tuesday", "wednesday", "thursday",
@@ -166,7 +170,7 @@ public class Config {
     public int getStaffingPercent(DayOfWeek day) { return staffingPercent.get(day); }
     public LocalTime getPeakHour(DayOfWeek day) { return peakHours.get(day); }
     public List<Integer> getShiftLengths() { return shiftLengths; }
-
+    public int getMaxWorkingDaysInARow() { return maxWorkingDaysInARow; }
     public record DayHours(LocalTime open, LocalTime close) {}
 
 }
