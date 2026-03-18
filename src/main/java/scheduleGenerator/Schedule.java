@@ -6,11 +6,12 @@ import model.Section;
 import shiftPoolGenerator.ShiftCombination;
 
 import java.time.DayOfWeek;
+import java.time.Year;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Random;
 
-public class Schedule {
+public class Schedule implements Chromosome {
     private final int[][] genes;
     private final int employees;
     private final int daysInMonth;
@@ -36,7 +37,15 @@ public class Schedule {
             genes[i] = initRow(section.getEmployees().get(i));
         }
 
-        calculateFitness();
+        this.fitness = calculateFitness();
+    }
+
+    public Schedule(Section section, YearMonth yearMonth, int[][] genes) {
+        this.employees = section.getEmployees().size();
+        this.daysInMonth = yearMonth.lengthOfMonth();
+        this.firstDay = yearMonth.atDay(1).getDayOfWeek();
+        this.genes = genes;
+        this.fitness = calculateFitness();
     }
 
     private int[] initRow(Employee employee) {
@@ -74,7 +83,6 @@ public class Schedule {
             fitness += checkConsecutiveDays(emp);
         }
 
-        this.fitness = fitness;
         return fitness;
     }
 
@@ -83,7 +91,7 @@ public class Schedule {
         for (int day = 0; day < daysInMonth; day++) {
             if (genes[employeeIndex][day] > 0) {
                 consecutiveCount++;
-                if (consecutiveCount > cfg.getMaxConsecutiveDays()) {
+                if (consecutiveCount > cfg.getMaxWorkingDaysInARow()) {
                     return PENALTY_CONSECUTIVE_DAYS;
                 }
             } else {
@@ -123,5 +131,13 @@ public class Schedule {
 
         double diff = Math.abs(working - target);
         return diff * PENALTY_DAY_WEIGHT;
+    }
+
+    public double getFitness() {
+        return fitness;
+    }
+
+    public int[][] getGenes() {
+        return genes;
     }
 }
