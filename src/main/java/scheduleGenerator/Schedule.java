@@ -71,8 +71,7 @@ public class Schedule implements Chromosome {
         }
     }
 
-
-    private double calculateFitness() {
+    public double calculateFitness() {
         double fitness = 0;
         for (int day = 0; day < daysInMonth; day++) {
             fitness += checkDayCoverage(day);
@@ -136,8 +135,9 @@ public class Schedule implements Chromosome {
     public double getFitness() {
         return fitness;
     }
-
     public int[][] getGenes() {
         return genes;
     }
+    public int getDaysInMonth() { return daysInMonth; }
+    public int getEmployees() { return employees; }
 }
