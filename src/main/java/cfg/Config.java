@@ -15,6 +15,14 @@ import Exception.cfg.ConfigException;
 
 public class Config {
 
+    private Config(List<Integer> shiftLengths, int maxWorkingDaysInARow,
+                   Map<DayOfWeek, DayHours> hours, Map<DayOfWeek, Integer> staffingPercent) {
+        this.shiftLengths = shiftLengths;
+        this.maxWorkingDaysInARow = maxWorkingDaysInARow;
+        this.hours.putAll(hours);
+        this.staffingPercent.putAll(staffingPercent);
+    }
+
     private static Config instance;
 
     private final Map<DayOfWeek, DayHours> hours = new EnumMap<>(DayOfWeek.class);
@@ -28,6 +36,8 @@ public class Config {
     //
     //Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał testować różne funkcje oceny
     //Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy będziesz eksperymentował z różnymi podejściami
+
+    // dodaj mutationRate
 
     private static final String[] DAY_NAMES = {
             "monday", "tuesday", "wednesday", "thursday",
@@ -172,5 +182,15 @@ public class Config {
     public List<Integer> getShiftLengths() { return shiftLengths; }
     public int getMaxWorkingDaysInARow() { return maxWorkingDaysInARow; }
     public record DayHours(LocalTime open, LocalTime close) {}
+
+
+    // for tests
+    public static void initForTest(List<Integer> shiftLengths, int maxWorkingDaysInARow,
+                                   Map<DayOfWeek, DayHours> hours,
+                                   Map<DayOfWeek, Integer> staffingPercent) throws ConfigException {
+        instance = new Config(shiftLengths, maxWorkingDaysInARow, hours, staffingPercent);
+    }
+    public static void reset() { instance = null; }
+
 
 }

@@ -33,4 +33,8 @@ public class ShiftClusterer {
             target.add(cluster.get(index));
         }
     }
+
+    public List<ShiftCombination> getLow() { return low; }
+    public List<ShiftCombination> getMedium() { return medium; }
+    public List<ShiftCombination> getHigh() { return high; }
 }
