@@ -6,41 +6,42 @@ import model.Section;
 import shiftPoolGenerator.ShiftCombination;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.Year;
 import java.time.YearMonth;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class Schedule implements Chromosome {
+    private final Config cfg = Config.getInstance();
     private final int[][] genes;
     private final int employees;
     private final int daysInMonth;
     private final DayOfWeek firstDay;
     private double fitness;
     private final Random random = new Random();
+    private final YearMonth yearMonth = cfg.getYearMonth();
 
+    private static final double PENALTY_DAY_OFF = 1000;     // pracownik ma dzień wolny, a jest zaplanowany
     private static final double PENALTY_NO_COVERAGE = 60;      // brak pokrycia godzin otwarcia
     private static final double PENALTY_CONSECUTIVE_DAYS = 30;  // za dużo dni pod rząd
     private static final double PENALTY_NO_PEAK = 10;            // brak pokrycia peak hours
     private static final double PENALTY_DAY_WEIGHT = 15;         // niedopasowanie do wag dni
     private static final double PENALTY_SAME_START = 10;          // >2 osoby o tej samej godzinie
 
-    private final Config cfg = Config.getInstance();
-
-    public Schedule(Section section, YearMonth yearMonth) {
+    public Schedule(Section section) {
         this.employees = section.getEmployees().size();
         this.daysInMonth = yearMonth.lengthOfMonth();
         this.firstDay = yearMonth.atDay(1).getDayOfWeek();
         this.genes = new int[employees][daysInMonth];
 
         for (int i = 0; i < employees; i++) {
-            genes[i] = initRow(section.getEmployees().get(i));
+            genes[i] = initRow(section.getEmployees().get(i), getClosedDayIndices(yearMonth));
         }
 
         this.fitness = calculateFitness();
     }
 
-    public Schedule(Section section, YearMonth yearMonth, int[][] genes) {
+    public Schedule(Section section, int[][] genes) {
         this.employees = section.getEmployees().size();
         this.daysInMonth = yearMonth.lengthOfMonth();
         this.firstDay = yearMonth.atDay(1).getDayOfWeek();
@@ -48,7 +49,7 @@ public class Schedule implements Chromosome {
         this.fitness = calculateFitness();
     }
 
-    private int[] initRow(Employee employee) {
+    private int[] initRow(Employee employee, List<Integer> closedDays) {
         List<ShiftCombination> pool = employee.getShiftPool();
         ShiftCombination combo = pool.get(random.nextInt(pool.size()));
 
@@ -59,7 +60,33 @@ public class Schedule implements Chromosome {
         }
 
         shuffleArray(row);
+
+        Set<Integer> allOff = new HashSet<>(closedDays);
+        allOff.addAll(employee.getDaysOff());
+
+        for (int offDay : allOff) {
+            if (row[offDay] != 0) {
+                for (int j = 0; j < row.length; j++) {
+                    if (row[j] == 0 && !allOff.contains(j)) {
+                        row[j] = row[offDay];
+                        row[offDay] = 0;
+                        break;
+                    }
+                }
+            }
+        }
         return row;
+    }
+
+    private List<Integer> getClosedDayIndices(YearMonth yearMonth) {
+        List<Integer> closedDays = new ArrayList<>();
+        for (int i=0; i<daysInMonth; i++) {
+            LocalDate date = yearMonth.atDay(i+1);
+            if (cfg.isClosedDay(date)) {
+                closedDays.add(i);
+            }
+        }
+        return closedDays;
     }
 
     private void shuffleArray(int[] ar) {
@@ -76,6 +103,7 @@ public class Schedule implements Chromosome {
         for (int day = 0; day < daysInMonth; day++) {
             fitness += checkDayCoverage(day);
             fitness += checkStaffingTarget(day);
+            fitness += checkClosedDays(day);
         }
 
         for (int emp = 0; emp < employees; emp++) {
@@ -132,12 +160,20 @@ public class Schedule implements Chromosome {
         return diff * PENALTY_DAY_WEIGHT;
     }
 
-    public double getFitness() {
-        return fitness;
+    private double checkClosedDays(int dayIndex) {
+        LocalDate date = yearMonth.atDay(dayIndex + 1);
+        if (!cfg.isClosedDay(date)) return 0;
+
+        for(int i=0; i<employees; i++) {
+            if (genes[i][dayIndex] > 0) {
+                return PENALTY_DAY_OFF;
+            }
+        }
+        return 0;
     }
-    public int[][] getGenes() {
-        return genes;
-    }
+
+    public double getFitness() { return fitness; }
+    public int[][] getGenes() { return genes; }
     public int getDaysInMonth() { return daysInMonth; }
     public int getEmployees() { return employees; }
 }
