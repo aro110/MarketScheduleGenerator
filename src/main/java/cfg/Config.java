@@ -1,196 +1,221 @@
 package cfg;
 
-import org.tomlj.Toml;
-import org.tomlj.TomlParseResult;
-import org.tomlj.TomlTable;
-import java.nio.file.Path;
-import java.nio.file.Files;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.EnumMap;
-import java.util.ArrayList;
 import Exception.cfg.ConfigException;
+import model.Section;
 
 public class Config {
 
-    private Config(List<Integer> shiftLengths, int maxWorkingDaysInARow,
-                   Map<DayOfWeek, DayHours> hours, Map<DayOfWeek, Integer> staffingPercent) {
-        this.shiftLengths = shiftLengths;
-        this.maxWorkingDaysInARow = maxWorkingDaysInARow;
-        this.hours.putAll(hours);
-        this.staffingPercent.putAll(staffingPercent);
-    }
+    // dodaj godziny startu
+// dodaj ile ma byc roznych ShiftPool
+// Co można poprawić, ale nie teraz:
+//
+// Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał testować różne funkcje oceny
+// Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy będziesz eksperymentował z różnymi podejściami
+
+// dodaj mutationRate
+// zrekonfiguruj odchylenia, zbyt duzo skrajnych
 
     private static Config instance;
 
-    private final Map<DayOfWeek, DayHours> hours = new EnumMap<>(DayOfWeek.class);
-    private final Map<DayOfWeek, Integer> staffingPercent = new EnumMap<>(DayOfWeek.class);
-    private final Map<DayOfWeek, LocalTime> peakHours = new EnumMap<>(DayOfWeek.class);
+    // ==================== Ustawienia sklepu ====================
+    private final Map<DayOfWeek, DayHours> hours;
+    private final Map<DayOfWeek, Integer> staffingPercent;
+    private final Map<DayOfWeek, LocalTime> peakHours;
     private final List<Integer> shiftLengths;
     private final int maxWorkingDaysInARow;
-    // dodaj godziny startu
-    // dodaj ile ma byc roznych ShiftPool
-    //Co można poprawić, ale nie teraz:
-    //
-    //Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał testować różne funkcje oceny
-    //Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy będziesz eksperymentował z różnymi podejściami
 
-    // dodaj mutationRate
+    // ==================== Dane generowania ====================
+    private final YearMonth yearMonth;
+    private final List<LocalDate> holidays;
+    private final List<LocalDate> tradingSundays;
+    private final List<Section> sections;
 
-    private static final String[] DAY_NAMES = {
-            "monday", "tuesday", "wednesday", "thursday",
-            "friday", "saturday", "sunday"
-    };
-
-    private Config(String path) throws ConfigException {
-        TomlParseResult toml = parseFile(path);
-        validateStructure(toml);
-
-        for (String dayName : DAY_NAMES) {
-            DayOfWeek day = DayOfWeek.valueOf(dayName.toUpperCase());
-
-            TomlTable dayTable = toml.getTable("hours." + dayName);
-            LocalTime open = dayTable.getLocalTime("open");
-            LocalTime close = dayTable.getLocalTime("close");
-            validateHours(dayName, open, close);
-            hours.put(day, new DayHours(open, close));
-
-            int percent = Math.toIntExact(toml.getLong("staffing_percent." + dayName));
-            validatePercent(dayName, percent);
-            staffingPercent.put(day, percent);
-
-            LocalTime peak = toml.getLocalTime("peak_hours." + dayName);
-            validatePeakHour(dayName, peak, open, close);
-            peakHours.put(day, peak);
-        }
-
-        shiftLengths = parseShiftLengths(toml);
-
-        maxWorkingDaysInARow = Math.toIntExact(toml.getLong("max_working_days_in_row"));
-        validateMaxWorkingDays(maxWorkingDaysInARow);
+    private Config(Map<DayOfWeek, DayHours> hours,
+                   Map<DayOfWeek, Integer> staffingPercent,
+                   Map<DayOfWeek, LocalTime> peakHours,
+                   List<Integer> shiftLengths,
+                   int maxWorkingDaysInARow,
+                   YearMonth yearMonth,
+                   List<LocalDate> holidays,
+                   List<LocalDate> tradingSundays,
+                   List<Section> sections) {
+        this.hours = new EnumMap<>(hours);
+        this.staffingPercent = new EnumMap<>(staffingPercent);
+        this.peakHours = new EnumMap<>(peakHours);
+        this.shiftLengths = List.copyOf(shiftLengths);
+        this.maxWorkingDaysInARow = maxWorkingDaysInARow;
+        this.yearMonth = yearMonth;
+        this.holidays = List.copyOf(holidays);
+        this.tradingSundays = List.copyOf(tradingSundays);
+        this.sections = List.copyOf(sections);
     }
 
-    public static void init(String path) throws ConfigException {
+    // ==================== Inicjalizacja ====================
+
+    public static void init(Map<DayOfWeek, DayHours> hours,
+                            Map<DayOfWeek, Integer> staffingPercent,
+                            Map<DayOfWeek, LocalTime> peakHours,
+                            List<Integer> shiftLengths,
+                            int maxWorkingDaysInARow,
+                            YearMonth yearMonth,
+                            List<LocalDate> holidays,
+                            List<LocalDate> tradingSundays,
+                            List<Section> sections) throws ConfigException {
         if (instance != null) {
             throw new ConfigException("Config już został zainicjalizowany");
         }
-        instance = new Config(path);
+        validate(hours, staffingPercent, peakHours, shiftLengths, maxWorkingDaysInARow,
+                yearMonth, holidays, tradingSundays, sections);
+        instance = new Config(hours, staffingPercent, peakHours, shiftLengths,
+                maxWorkingDaysInARow, yearMonth, holidays, tradingSundays, sections);
     }
 
     public static Config getInstance() {
         if (instance == null) {
-            throw new IllegalStateException("Config nie został zainicjalizowany. Wywołaj Config.init(path) najpierw.");
+            throw new IllegalStateException("Config nie został zainicjalizowany.");
         }
         return instance;
     }
 
-    private TomlParseResult parseFile(String path) throws ConfigException {
-        try {
-            if (!Files.exists(Path.of(path))) {
-                throw new ConfigException("Plik konfiguracyjny nie istnieje: " + path);
-            }
-            TomlParseResult toml = Toml.parse(Path.of(path));
-            if (toml.hasErrors()) {
-                throw new ConfigException("Błąd składni TOML: " + toml.errors().getFirst().getMessage());
-            }
-            return toml;
-        } catch (ConfigException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ConfigException("Nie udało się odczytać pliku: " + e.getMessage());
-        }
+    public static void reset() { instance = null; }
+
+    // ==================== Dni zamknięte ====================
+
+    public boolean isClosedDay(LocalDate date) {
+        if (holidays.contains(date)) return true;
+        return date.getDayOfWeek() == DayOfWeek.SUNDAY
+                && !tradingSundays.contains(date);
     }
 
-    private void validateMaxWorkingDays(int maxWorkingDaysInARow) throws ConfigException {
-        if (maxWorkingDaysInARow <= 0) {
-            throw new ConfigException("max_working_days_in_row musi być >1, podano: " + maxWorkingDaysInARow);
-        }
-    }
-
-    private void validateStructure(TomlParseResult toml) throws ConfigException {
-        List<String> missing = new ArrayList<>();
-
-        for (String section : List.of("hours", "staffing_percent", "peak_hours")) {
-            if (toml.getTable(section) == null) {
-                missing.add("[" + section + "]");
+    private int countDaysClosed() {
+        int daysClosed = 0;
+        for(int i=0; i< yearMonth.lengthOfMonth(); i++) {
+            LocalDate date = yearMonth.atDay(i+1);
+            if (isClosedDay(date)) {
+                daysClosed++;
             }
         }
-        if (toml.getArray("shift_lengths") == null) {
-            missing.add("shift_lengths");
-        }
-
-        if (!missing.isEmpty()) {
-            throw new ConfigException("Brakujące sekcje: " + String.join(", ", missing));
-        }
-
-        for (String day : DAY_NAMES) {
-            if (toml.getTable("hours." + day) == null)
-                missing.add("hours." + day);
-            if (toml.getLong("staffing_percent." + day) == null)
-                missing.add("staffing_percent." + day);
-            if (toml.getLocalTime("peak_hours." + day) == null)
-                missing.add("peak_hours." + day);
-        }
-
-        if (!missing.isEmpty()) {
-            throw new ConfigException("Brakujące wpisy dla dni: " + String.join(", ", missing));
-        }
+        return daysClosed;
     }
 
-    private void validateHours(String day, LocalTime open, LocalTime close) throws ConfigException {
-        if (!close.isAfter(open)) {
-            throw new ConfigException(day + ": godzina zamknięcia (" + close
-                    + ") musi być po godzinie otwarcia (" + open + ")");
-        }
-    }
-
-    private void validatePercent(String day, int percent) throws ConfigException {
-        if (percent < 0 || percent > 100) {
-            throw new ConfigException(day + ": staffing_percent musi być 0-100, podano: " + percent);
-        }
-    }
-
-    private void validatePeakHour(String day, LocalTime peak, LocalTime open, LocalTime close) throws ConfigException {
-        if (peak.isBefore(open) || peak.isAfter(close)) {
-            throw new ConfigException(day + ": peak_hour (" + peak
-                    + ") musi być pomiędzy " + open + " a " + close);
-        }
-    }
-
-    private List<Integer> parseShiftLengths(TomlParseResult toml) throws ConfigException {
-        List<Integer> lengths = toml.getArray("shift_lengths")
-                .toList().stream()
-                .map(o -> ((Long) o).intValue())
-                .toList();
-
-        if (lengths.isEmpty()) {
-            throw new ConfigException("shift_lengths nie może być puste");
-        }
-        for (int len : lengths) {
-            if (len <= 0 || len > 12) {
-                throw new ConfigException("shift_lengths: nieprawidłowa wartość: " + len + " (wymagane 1-24)");
-            }
-        }
-        return lengths;
-    }
+    // ==================== Gettery — ustawienia sklepu ====================
 
     public DayHours getHours(DayOfWeek day) { return hours.get(day); }
     public int getStaffingPercent(DayOfWeek day) { return staffingPercent.get(day); }
     public LocalTime getPeakHour(DayOfWeek day) { return peakHours.get(day); }
     public List<Integer> getShiftLengths() { return shiftLengths; }
     public int getMaxWorkingDaysInARow() { return maxWorkingDaysInARow; }
+
+    // ==================== Gettery — dane generowania ====================
+
+    public YearMonth getYearMonth() { return yearMonth; }
+    public int getDaysInMonth() { return yearMonth.lengthOfMonth(); }
+    public DayOfWeek getFirstDayOfWeek() { return yearMonth.atDay(1).getDayOfWeek(); }
+    public List<LocalDate> getHolidays() { return holidays; }
+    public List<LocalDate> getTradingSundays() { return tradingSundays; }
+    public List<Section> getSections() { return sections; }
+    public int getClosedDaysSize() { return countDaysClosed(); }
+
     public record DayHours(LocalTime open, LocalTime close) {}
 
+    // ==================== Walidacja ====================
 
-    // for tests
+    private static void validate(Map<DayOfWeek, DayHours> hours,
+                                 Map<DayOfWeek, Integer> staffingPercent,
+                                 Map<DayOfWeek, LocalTime> peakHours,
+                                 List<Integer> shiftLengths,
+                                 int maxWorkingDaysInARow,
+                                 YearMonth yearMonth,
+                                 List<LocalDate> holidays,
+                                 List<LocalDate> tradingSundays,
+                                 List<Section> sections) throws ConfigException {
+        if (maxWorkingDaysInARow <= 0) {
+            throw new ConfigException("max_working_days_in_row musi być > 0, podano: " + maxWorkingDaysInARow);
+        }
+
+        if (shiftLengths == null || shiftLengths.isEmpty()) {
+            throw new ConfigException("shift_lengths nie może być puste");
+        }
+        for (int len : shiftLengths) {
+            if (len <= 0 || len > 12) {
+                throw new ConfigException("shift_lengths: nieprawidłowa wartość: " + len + " (wymagane 1-12)");
+            }
+        }
+
+        for (DayOfWeek day : DayOfWeek.values()) {
+            String dayName = day.name().toLowerCase();
+
+            if (!hours.containsKey(day)) {
+                throw new ConfigException("Brak godzin otwarcia dla: " + dayName);
+            }
+            DayHours dh = hours.get(day);
+            if (!dh.close().isAfter(dh.open())) {
+                throw new ConfigException(dayName + ": godzina zamknięcia (" + dh.close()
+                        + ") musi być po godzinie otwarcia (" + dh.open() + ")");
+            }
+
+            if (!staffingPercent.containsKey(day)) {
+                throw new ConfigException("Brak staffing_percent dla: " + dayName);
+            }
+            int percent = staffingPercent.get(day);
+            if (percent < 0 || percent > 100) {
+                throw new ConfigException(dayName + ": staffing_percent musi być 0-100, podano: " + percent);
+            }
+
+            if (!peakHours.containsKey(day)) {
+                throw new ConfigException("Brak peak_hours dla: " + dayName);
+            }
+            LocalTime peak = peakHours.get(day);
+            if (peak.isBefore(dh.open()) || peak.isAfter(dh.close())) {
+                throw new ConfigException(dayName + ": peak_hour (" + peak
+                        + ") musi być pomiędzy " + dh.open() + " a " + dh.close());
+            }
+        }
+
+        if (yearMonth == null) {
+            throw new ConfigException("yearMonth nie może być null");
+        }
+
+        for (LocalDate holiday : holidays) {
+            if (!yearMonth.equals(YearMonth.from(holiday))) {
+                throw new ConfigException("Święto " + holiday + " nie należy do miesiąca " + yearMonth);
+            }
+        }
+
+        for (LocalDate sunday : tradingSundays) {
+            if (sunday.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                throw new ConfigException(sunday + " nie jest niedzielą");
+            }
+            if (!yearMonth.equals(YearMonth.from(sunday))) {
+                throw new ConfigException("Niedziela handlowa " + sunday + " nie należy do miesiąca " + yearMonth);
+            }
+        }
+
+        if (sections == null || sections.isEmpty()) {
+            throw new ConfigException("Musi być przynajmniej jeden dział");
+        }
+    }
+
+    // ==================== Testy ====================
+
     public static void initForTest(List<Integer> shiftLengths, int maxWorkingDaysInARow,
                                    Map<DayOfWeek, DayHours> hours,
-                                   Map<DayOfWeek, Integer> staffingPercent) throws ConfigException {
-        instance = new Config(shiftLengths, maxWorkingDaysInARow, hours, staffingPercent);
+                                   Map<DayOfWeek, Integer> staffingPercent,
+                                   YearMonth yearMonth,
+                                   List<Section> sections) {
+        Map<DayOfWeek, LocalTime> peakHours = new EnumMap<>(DayOfWeek.class);
+        for (DayOfWeek day : DayOfWeek.values()) {
+            DayHours dh = hours.get(day);
+            peakHours.put(day, dh.open().plusHours(3));
+        }
+        instance = new Config(hours, staffingPercent, peakHours, shiftLengths,
+                maxWorkingDaysInARow, yearMonth, List.of(), List.of(), sections);
     }
-    public static void reset() { instance = null; }
-
-
 }

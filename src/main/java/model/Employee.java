@@ -13,15 +13,17 @@ public class Employee {
     private final int totalHours;
     private final int totalDays;
     private final List<ShiftCombination> shiftPool;
+    private final List<Integer> daysOff;
 
 
-    public Employee(String name, String surname, String section, int totalHours, int totalDays) throws IllegalArgumentException {
+    public Employee(String name, String surname, String section, int totalHours, int totalDays, List<Integer> daysOff) throws IllegalArgumentException {
         this.name = name;
         this.surname = surname;
         this.section = section;
         this.totalHours = totalHours;
         this.totalDays = totalDays;
         this.shiftPool = ShiftPool.getInstance().generateAll(totalHours, totalDays);
+        this.daysOff = daysOff;
         validateTotalHours(Config.getInstance().getShiftLengths());
         validateTotalDays(totalDays);
     }
@@ -39,8 +41,8 @@ public class Employee {
     }
 
     private void validateTotalDays(int totalDays) throws IllegalArgumentException {
-        if (totalDays <= 0) {
-            throw new IllegalArgumentException("Liczba dni musi być większa niż 0.");
+        if (totalDays <= 0 || (totalDays - daysOff.size() - Config.getInstance().getClosedDaysSize() < 0)) {
+            throw new IllegalArgumentException("Niepoprawna wartość ilości dni pracy.");
         }
     }
 
@@ -66,5 +68,9 @@ public class Employee {
 
     public List<ShiftCombination> getShiftPool() {
         return shiftPool;
+    }
+
+    public List<Integer> getDaysOff() {
+        return daysOff;
     }
 }

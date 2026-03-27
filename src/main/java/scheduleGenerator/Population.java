@@ -1,5 +1,7 @@
 package scheduleGenerator;
 
+import cfg.Config;
+import model.Employee;
 import model.Section;
 
 import java.time.YearMonth;
@@ -14,6 +16,7 @@ public class Population {
     private final YearMonth yearMonth;
     private final int size;
     private final Random random;
+    private final Config cfg = Config.getInstance();
 
     public Population(Section section, YearMonth yearMonth, int size) {
         this.section = section;
@@ -21,7 +24,7 @@ public class Population {
         this.size = size;
         this.scheduleList = new ArrayList<>();
         for (int i=0; i<size; i++) {
-            scheduleList.add(new Schedule(section, yearMonth));
+            scheduleList.add(new Schedule(section));
         }
         this.random = new Random();
     }
@@ -78,20 +81,21 @@ public class Population {
                 childGenes[i] = parent2.getGenes()[i].clone();
             }
         }
-        return new Schedule(section, yearMonth, childGenes);
+        return new Schedule(section, childGenes);
     }
 
     private Schedule mutate(Schedule schedule, double mutationRate) {
         int[][] genes = schedule.getGenes();
+        List<Employee> employees = section.getEmployees();
         for (int i = 0; i < genes.length; i++) {
             if (random.nextDouble() < mutationRate) {
                 int day1 = random.nextInt(genes[i].length);
-                while (genes[i][day1] != 0) {
+                while (genes[i][day1] != 0 || employees.get(i).getDaysOff().contains(day1) || cfg.isClosedDay(yearMonth.atDay(day1 + 1))) {
                     day1 = random.nextInt(genes[i].length);
                 }
 
                 int day2 = random.nextInt(genes[i].length);
-                while (genes[i][day2] == 0) {
+                while (genes[i][day2] == 0 || employees.get(i).getDaysOff().contains(day2) || cfg.isClosedDay(yearMonth.atDay(day2 + 1))) {
                     day2 = random.nextInt(genes[i].length);
                 }
 
