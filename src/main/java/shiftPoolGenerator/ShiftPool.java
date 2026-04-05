@@ -23,6 +23,8 @@ public class ShiftPool {
         return instance;
     }
 
+    public static void reset() { instance = null; }
+
     public List<ShiftCombination> generateAll(int totalHours, int days) {
         String key = totalHours + "-" + days;
         if (cache.containsKey(key)) {
