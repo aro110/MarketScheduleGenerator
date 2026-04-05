@@ -4,7 +4,6 @@ import cfg.Config;
 import model.Employee;
 import model.Section;
 
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -13,14 +12,12 @@ import java.util.Random;
 public class Population {
     private final Section section;
     private List<Schedule> scheduleList;
-    private final YearMonth yearMonth;
     private final int size;
     private final Random random;
     private final Config cfg = Config.getInstance();
 
-    public Population(Section section, YearMonth yearMonth, int size) {
+    public Population(Section section, int size) {
         this.section = section;
-        this.yearMonth = yearMonth;
         this.size = size;
         this.scheduleList = new ArrayList<>();
         for (int i=0; i<size; i++) {
@@ -90,12 +87,16 @@ public class Population {
         for (int i = 0; i < genes.length; i++) {
             if (random.nextDouble() < mutationRate) {
                 int day1 = random.nextInt(genes[i].length);
-                while (genes[i][day1] != 0 || employees.get(i).getDaysOff().contains(day1) || cfg.isClosedDay(yearMonth.atDay(day1 + 1))) {
+                while (genes[i][day1] != 0
+                        || employees.get(i).getDaysOff().contains(day1)
+                        || cfg.isClosedDay(cfg.getYearMonth().atDay(day1 + 1))) {
                     day1 = random.nextInt(genes[i].length);
                 }
 
                 int day2 = random.nextInt(genes[i].length);
-                while (genes[i][day2] == 0 || employees.get(i).getDaysOff().contains(day2) || cfg.isClosedDay(yearMonth.atDay(day2 + 1))) {
+                while (genes[i][day2] == 0
+                        || employees.get(i).getDaysOff().contains(day2)
+                        || cfg.isClosedDay(cfg.getYearMonth().atDay(day2 + 1))) {
                     day2 = random.nextInt(genes[i].length);
                 }
 
