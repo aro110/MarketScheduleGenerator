@@ -13,21 +13,23 @@ import model.Section;
 public class Config {
 
     // dodaj godziny startu
-// dodaj ile ma byc roznych ShiftPool
-// Co można poprawić, ale nie teraz:
-//
-// Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał testować różne funkcje oceny
-// Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy będziesz eksperymentował z różnymi podejściami
+    // dodaj ile ma byc roznych ShiftPool
+    // Co można poprawić, ale nie teraz:
+    //
+    // Wydzielenie strategii fitness jako interfejs — przydatne gdy będziesz chciał
+    // testować różne funkcje oceny
+    // Interfejs dla operatorów ewolucyjnych (mutacja, krzyżowanie) — przydatne gdy
+    // będziesz eksperymentował z różnymi podejściami
 
-// dodaj mutationRate
-// zrekonfiguruj odchylenia, zbyt duzo skrajnych
+    // dodaj mutationRate
+    // zrekonfiguruj odchylenia, zbyt duzo skrajnych
 
     private static Config instance;
 
     // ==================== Ustawienia sklepu ====================
     private final Map<DayOfWeek, DayHours> hours;
     private final Map<DayOfWeek, Integer> staffingPercent;
-    private final Map<DayOfWeek, LocalTime> peakHours;
+    private final Map<DayOfWeek, PeakHours> peakHours;
     private final List<Integer> shiftLengths;
     private final int maxWorkingDaysInARow;
 
@@ -36,16 +38,18 @@ public class Config {
     private final List<LocalDate> holidays;
     private final List<LocalDate> tradingSundays;
     private final List<Section> sections;
+    private final boolean grantFreeWeekend;
 
     private Config(Map<DayOfWeek, DayHours> hours,
-                   Map<DayOfWeek, Integer> staffingPercent,
-                   Map<DayOfWeek, LocalTime> peakHours,
-                   List<Integer> shiftLengths,
-                   int maxWorkingDaysInARow,
-                   YearMonth yearMonth,
-                   List<LocalDate> holidays,
-                   List<LocalDate> tradingSundays,
-                   List<Section> sections) {
+            Map<DayOfWeek, Integer> staffingPercent,
+            Map<DayOfWeek, PeakHours> peakHours,
+            List<Integer> shiftLengths,
+            int maxWorkingDaysInARow,
+            YearMonth yearMonth,
+            List<LocalDate> holidays,
+            List<LocalDate> tradingSundays,
+            List<Section> sections,
+            boolean grantFreeWeekend) {
         this.hours = new EnumMap<>(hours);
         this.staffingPercent = new EnumMap<>(staffingPercent);
         this.peakHours = new EnumMap<>(peakHours);
@@ -55,26 +59,28 @@ public class Config {
         this.holidays = List.copyOf(holidays);
         this.tradingSundays = List.copyOf(tradingSundays);
         this.sections = List.copyOf(sections);
+        this.grantFreeWeekend = grantFreeWeekend;
     }
 
     // ==================== Inicjalizacja ====================
 
     public static void init(Map<DayOfWeek, DayHours> hours,
-                            Map<DayOfWeek, Integer> staffingPercent,
-                            Map<DayOfWeek, LocalTime> peakHours,
-                            List<Integer> shiftLengths,
-                            int maxWorkingDaysInARow,
-                            YearMonth yearMonth,
-                            List<LocalDate> holidays,
-                            List<LocalDate> tradingSundays,
-                            List<Section> sections) throws ConfigException {
+            Map<DayOfWeek, Integer> staffingPercent,
+            Map<DayOfWeek, PeakHours> peakHours,
+            List<Integer> shiftLengths,
+            int maxWorkingDaysInARow,
+            YearMonth yearMonth,
+            List<LocalDate> holidays,
+            List<LocalDate> tradingSundays,
+            List<Section> sections,
+            boolean grantFreeWeekend) throws ConfigException {
         if (instance != null) {
             throw new ConfigException("Config już został zainicjalizowany");
         }
         validate(hours, staffingPercent, peakHours, shiftLengths, maxWorkingDaysInARow,
                 yearMonth, holidays, tradingSundays, sections);
         instance = new Config(hours, staffingPercent, peakHours, shiftLengths,
-                maxWorkingDaysInARow, yearMonth, holidays, tradingSundays, sections);
+                maxWorkingDaysInARow, yearMonth, holidays, tradingSundays, sections, grantFreeWeekend);
     }
 
     public static Config getInstance() {
@@ -84,20 +90,23 @@ public class Config {
         return instance;
     }
 
-    public static void reset() { instance = null; }
+    public static void reset() {
+        instance = null;
+    }
 
     // ==================== Dni zamknięte ====================
 
     public boolean isClosedDay(LocalDate date) {
-        if (holidays.contains(date)) return true;
+        if (holidays.contains(date))
+            return true;
         return date.getDayOfWeek() == DayOfWeek.SUNDAY
                 && !tradingSundays.contains(date);
     }
 
     private int countDaysClosed() {
         int daysClosed = 0;
-        for(int i=0; i< yearMonth.lengthOfMonth(); i++) {
-            LocalDate date = yearMonth.atDay(i+1);
+        for (int i = 0; i < yearMonth.lengthOfMonth(); i++) {
+            LocalDate date = yearMonth.atDay(i + 1);
             if (isClosedDay(date)) {
                 daysClosed++;
             }
@@ -107,35 +116,114 @@ public class Config {
 
     // ==================== Gettery — ustawienia sklepu ====================
 
-    public DayHours getHours(DayOfWeek day) { return hours.get(day); }
-    public int getStaffingPercent(DayOfWeek day) { return staffingPercent.get(day); }
-    public LocalTime getPeakHour(DayOfWeek day) { return peakHours.get(day); }
-    public List<Integer> getShiftLengths() { return shiftLengths; }
-    public int getMaxWorkingDaysInARow() { return maxWorkingDaysInARow; }
+    public DayHours getHours(DayOfWeek day) {
+        return hours.get(day);
+    }
+
+    public LocalTime getOpenHour(DayOfWeek day) {
+        return hours.get(day).open();
+    }
+
+    public int getOpenHourInt(DayOfWeek day) {
+        return hours.get(day).open().getHour();
+    }
+
+    public LocalTime getCloseHour(DayOfWeek day) {
+        return hours.get(day).close();
+    }
+
+    public int getCloseHourInt(DayOfWeek day) {
+        return hours.get(day).close().getHour();
+    }
+
+    public int getStaffingPercent(DayOfWeek day) {
+        return staffingPercent.get(day);
+    }
+
+    public List<Integer> getShiftLengths() {
+        return shiftLengths;
+    }
+
+    public int getMaxWorkingDaysInARow() {
+        return maxWorkingDaysInARow;
+    }
 
     // ==================== Gettery — dane generowania ====================
 
-    public YearMonth getYearMonth() { return yearMonth; }
-    public int getDaysInMonth() { return yearMonth.lengthOfMonth(); }
-    public DayOfWeek getFirstDayOfWeek() { return yearMonth.atDay(1).getDayOfWeek(); }
-    public List<LocalDate> getHolidays() { return holidays; }
-    public List<LocalDate> getTradingSundays() { return tradingSundays; }
-    public List<Section> getSections() { return sections; }
-    public int getClosedDaysSize() { return countDaysClosed(); }
+    public int[] getPeakHoursArray(DayOfWeek day) {
+        DayHours dh = hours.get(day);
+        int openHour = dh.open().getHour();
+        int closeHour = dh.close().getHour();
+        int length = closeHour - openHour;
 
-    public record DayHours(LocalTime open, LocalTime close) {}
+        int[] peak = new int[length];
+
+        PeakHours ph = peakHours.get(day);
+        int peakStart = ph.start().getHour();
+        int peakEnd = ph.end().getHour();
+
+        for (int i = 0; i < length; i++) {
+            int hour = openHour + i;
+            if (hour >= peakStart && hour < peakEnd) {
+                peak[i] = 1;
+            }
+        }
+        return peak;
+    }
+
+    public YearMonth getYearMonth() {
+        return yearMonth;
+    }
+
+    public int getDaysInMonth() {
+        return yearMonth.lengthOfMonth();
+    }
+
+    public PeakHours getPeakHour(DayOfWeek day) {
+        return peakHours.get(day);
+    }
+
+    public DayOfWeek getFirstDayOfWeek() {
+        return yearMonth.atDay(1).getDayOfWeek();
+    }
+
+    public List<LocalDate> getHolidays() {
+        return holidays;
+    }
+
+    public List<LocalDate> getTradingSundays() {
+        return tradingSundays;
+    }
+
+    public List<Section> getSections() {
+        return sections;
+    }
+
+    public int getClosedDaysSize() {
+        return countDaysClosed();
+    }
+
+    public boolean isGrantFreeWeekend() {
+        return grantFreeWeekend;
+    }
+
+    public record DayHours(LocalTime open, LocalTime close) {
+    }
+
+    public record PeakHours(LocalTime start, LocalTime end) {
+    }
 
     // ==================== Walidacja ====================
 
     private static void validate(Map<DayOfWeek, DayHours> hours,
-                                 Map<DayOfWeek, Integer> staffingPercent,
-                                 Map<DayOfWeek, LocalTime> peakHours,
-                                 List<Integer> shiftLengths,
-                                 int maxWorkingDaysInARow,
-                                 YearMonth yearMonth,
-                                 List<LocalDate> holidays,
-                                 List<LocalDate> tradingSundays,
-                                 List<Section> sections) throws ConfigException {
+            Map<DayOfWeek, Integer> staffingPercent,
+            Map<DayOfWeek, PeakHours> peakHours,
+            List<Integer> shiftLengths,
+            int maxWorkingDaysInARow,
+            YearMonth yearMonth,
+            List<LocalDate> holidays,
+            List<LocalDate> tradingSundays,
+            List<Section> sections) throws ConfigException {
         if (maxWorkingDaysInARow <= 0) {
             throw new ConfigException("max_working_days_in_row musi być > 0, podano: " + maxWorkingDaysInARow);
         }
@@ -172,10 +260,13 @@ public class Config {
             if (!peakHours.containsKey(day)) {
                 throw new ConfigException("Brak peak_hours dla: " + dayName);
             }
-            LocalTime peak = peakHours.get(day);
-            if (peak.isBefore(dh.open()) || peak.isAfter(dh.close())) {
-                throw new ConfigException(dayName + ": peak_hour (" + peak
-                        + ") musi być pomiędzy " + dh.open() + " a " + dh.close());
+            Config.PeakHours ph = peakHours.get(day);
+            if (ph.start().isBefore(dh.open()) || ph.end().isAfter(dh.close())) {
+                throw new ConfigException(dayName + ": peak_hours (" + ph.start()
+                        + "-" + ph.end() + ") musi być pomiędzy " + dh.open() + " a " + dh.close());
+            }
+            if (!ph.end().isAfter(ph.start())) {
+                throw new ConfigException(dayName + ": peak_hours end musi być po start");
             }
         }
 
@@ -206,16 +297,18 @@ public class Config {
     // ==================== Testy ====================
 
     public static void initForTest(List<Integer> shiftLengths, int maxWorkingDaysInARow,
-                                   Map<DayOfWeek, DayHours> hours,
-                                   Map<DayOfWeek, Integer> staffingPercent,
-                                   YearMonth yearMonth,
-                                   List<Section> sections) {
-        Map<DayOfWeek, LocalTime> peakHours = new EnumMap<>(DayOfWeek.class);
+            Map<DayOfWeek, DayHours> hours,
+            Map<DayOfWeek, Integer> staffingPercent,
+            YearMonth yearMonth,
+            List<Section> sections) {
+        Map<DayOfWeek, PeakHours> peakHours = new EnumMap<>(DayOfWeek.class);
         for (DayOfWeek day : DayOfWeek.values()) {
             DayHours dh = hours.get(day);
-            peakHours.put(day, dh.open().plusHours(3));
+            LocalTime peakStart = dh.open().plusHours(3);
+            LocalTime peakEnd = peakStart.plusHours(3);
+            peakHours.put(day, new PeakHours(peakStart, peakEnd));
         }
         instance = new Config(hours, staffingPercent, peakHours, shiftLengths,
-                maxWorkingDaysInARow, yearMonth, List.of(), List.of(), sections);
+                maxWorkingDaysInARow, yearMonth, List.of(), List.of(), sections, false);
     }
 }
