@@ -18,14 +18,14 @@ public class Schedule implements Chromosome {
     private double fitness;
     private final Random random = new Random();
 
-    private static final double PENALTY_DAY_OFF = 1000;     // pracownik ma dzień wolny, a jest zaplanowany
-    private static final double PENALTY_NO_COVERAGE = 60;      // brak pokrycia godzin otwarcia
-    private static final double PENALTY_CONSECUTIVE_DAYS = 30;  // za dużo dni pod rząd
-    //private static final double PENALTY_NO_PEAK = 10;            // brak pokrycia peak hours
-    private static final double PENALTY_DAY_WEIGHT = 15;         // niedopasowanie do wag dni
+    private static final double PENALTY_DAY_OFF = 1000; // pracownik ma dzień wolny, a jest zaplanowany
+    private static final double PENALTY_NO_COVERAGE = 100; // brak pokrycia godzin otwarcia
+    private static final double PENALTY_CONSECUTIVE_DAYS = 30; // za dużo dni pod rząd
+    // private static final double PENALTY_NO_PEAK = 10; // brak pokrycia peak hours
+    private static final double PENALTY_DAY_WEIGHT = 15; // niedopasowanie do wag dni
     private static final double PENALTY_FREE_DISTRIBUTION = 25; // nierownomiernie rozlozony grafik
-    //private static final double PENALTY_SAME_START = 10;          // >2 osoby o tej samej godzinie
-    private static final double PENALTY_FREE_WEEKENDS = 20;          // brak 1 wolnego weekendu
+    // private static final double PENALTY_SAME_START = 10; // >2 osoby o tej samej
+    // godzinie
 
     public Schedule(Section section) {
         this.employees = section.getEmployees().size();
@@ -47,7 +47,20 @@ public class Schedule implements Chromosome {
 
     private int[] initRow(Employee employee, List<Integer> closedDays) {
         List<ShiftCombination> pool = employee.getShiftPool();
-        ShiftCombination combo = pool.get(random.nextInt(pool.size()));
+        ShiftCombination combo;
+
+        if (employees <= 2) {
+            List<ShiftCombination> highVariance = pool.stream()
+                    .filter(sc -> sc.getStdDev() >= 2.0)
+                    .toList();
+            if (!highVariance.isEmpty()) {
+                combo = highVariance.get(random.nextInt(highVariance.size()));
+            } else {
+                combo = pool.get(random.nextInt(pool.size()));
+            }
+        } else {
+            combo = pool.get(random.nextInt(pool.size()));
+        }
 
         int[] row = new int[daysInMonth];
         List<Integer> shifts = combo.getShifts();
@@ -105,7 +118,6 @@ public class Schedule implements Chromosome {
         for (int emp = 0; emp < employees; emp++) {
             total += checkConsecutiveDays(emp);
             total += checkWorkDistribution(emp);
-            total += checkFreeWeekends(emp);
         }
 
         this.fitness = total;
@@ -130,7 +142,8 @@ public class Schedule implements Chromosome {
 
     private double checkDayCoverage(int dayIndex) {
         LocalDate date = cfg.getYearMonth().atDay(dayIndex + 1);
-        if (cfg.isClosedDay(date)) return 0;
+        if (cfg.isClosedDay(date))
+            return 0;
 
         DayOfWeek day = firstDay.plus(dayIndex);
         Config.DayHours dayHours = cfg.getHours(day);
@@ -142,14 +155,16 @@ public class Schedule implements Chromosome {
         }
 
         if (totalStaffHours < openHours) {
-            return PENALTY_NO_COVERAGE;
+            return (openHours - totalStaffHours) * PENALTY_NO_COVERAGE;
         }
+
         return 0;
     }
 
     private double checkStaffingTarget(int dayIndex) {
         LocalDate date = cfg.getYearMonth().atDay(dayIndex + 1);
-        if (cfg.isClosedDay(date)) return 0;
+        if (cfg.isClosedDay(date))
+            return 0;
 
         DayOfWeek day = firstDay.plus(dayIndex);
         double percent = cfg.getStaffingPercent(day) / 100.0;
@@ -157,7 +172,8 @@ public class Schedule implements Chromosome {
 
         int working = 0;
         for (int i = 0; i < employees; i++) {
-            if (genes[i][dayIndex] > 0) working++;
+            if (genes[i][dayIndex] > 0)
+                working++;
         }
 
         double diff = Math.abs(working - target);
@@ -166,7 +182,8 @@ public class Schedule implements Chromosome {
 
     private double checkClosedDays(int dayIndex) {
         LocalDate date = cfg.getYearMonth().atDay(dayIndex + 1);
-        if (!cfg.isClosedDay(date)) return 0;
+        if (!cfg.isClosedDay(date))
+            return 0;
 
         double penalty = 0;
         for (int i = 0; i < employees; i++) {
@@ -196,22 +213,19 @@ public class Schedule implements Chromosome {
         return penalty;
     }
 
-    private double checkFreeWeekends(int employeeIndex) {
-        int firstSaturday = (DayOfWeek.SATURDAY.getValue() - firstDay.getValue() + 7) % 7;
-        for (int day = firstSaturday; day < daysInMonth - 1; day += 7) {
-            boolean satFree = genes[employeeIndex][day] == 0;
-            boolean sunFree = genes[employeeIndex][day + 1] == 0;
-            boolean sunClosed = cfg.isClosedDay(cfg.getYearMonth().atDay(day + 2));
-
-            if (satFree && sunFree && !sunClosed) {
-                return 0;
-            }
-        }
-        return PENALTY_FREE_WEEKENDS;
+    public double getFitness() {
+        return fitness;
     }
 
-    public double getFitness() { return fitness; }
-    public int[][] getGenes() { return genes; }
-    public int getDaysInMonth() { return daysInMonth; }
-    public int getEmployees() { return employees; }
+    public int[][] getGenes() {
+        return genes;
+    }
+
+    public int getDaysInMonth() {
+        return daysInMonth;
+    }
+
+    public int getEmployees() {
+        return employees;
+    }
 }
